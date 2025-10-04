@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Audio Nook - Listen Anywhere</title>
+    <!-- Load Tailwind CSS from CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Lucide Icons for React (we'll use inline SVG equivalent for HTML) -->
+    <!-- We will use inline SVG icons directly for better performance -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'brand-purple': '#5b21b6', // Deep Purple
+                        'brand-light': '#a78bfa', // Light Purple
+                        'brand-bg': '#f3f4f6',    // Light Gray Background
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: theme('colors.brand-bg');
+            padding-bottom: 96px; /* Space for the fixed player */
+        }
+        /* Custom styles for the track progress bar */
+        #progress-bar {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            width: 100%;
+            cursor: pointer;
+            background: #e5e7eb; /* Track background */
+            border-radius: 9999px;
+        }
+        #progress-bar::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: theme('colors.brand-purple');
+            cursor: pointer;
+            box-shadow: 0 0 0 4px rgba(91, 33, 182, 0.3); /* Ring effect */
+            transition: background 0.15s ease-in-out;
+        }
+        #progress-bar::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: theme('colors.brand-purple');
+            cursor: pointer;
+            border: none;
+        }
+        .icon-lg {
+            width: 28px;
+            height: 28px;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <div id="app" class="flex flex-col">
+
+        <!-- Header -->
+        <header class="sticky top-0 z-10 bg-white shadow-lg">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+                <h1 class="text-3xl font-bold tracking-tight">
+                    <span class="text-brand-purple">Audio</span> Nook
+                </h1>
+                <p class="text-gray-500 hidden sm:block">Your Library of Narrated Stories</p>
+            </div>
+        </header>
+
+        <!-- Main Content (Audiobook List) -->
+        <main class="max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex-grow">
+            <h2 class="text-3xl font-extrabold text-gray-900 border-b-2 border-brand-light pb-2 mb-8">Bestselling Audiobooks</h2>
+            <div id="audiobook-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <!-- Audiobook cards will be injected here by JavaScript -->
+            </div>
+        </main>
+
+        <!-- Audio Player Interface (Fixed Bottom Bar) -->
+        <div id="audio-player-container" class="fixed bottom-0 left-0 right-0 h-24 bg-white shadow-2xl border-t border-gray-200 z-50 hidden transition-all duration-300 ease-in-out">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
+
+                <!-- Audio Element (hidden) -->
+                <audio id="audio-element" class="hidden"></audio>
+
+                <!-- Left Section: Track Info -->
+                <div class="flex items-center space-x-4 w-1/3 min-w-0">
+                    <img id="player-cover" src="https://placehold.co/60x60/a78bfa/ffffff?text=." alt="Cover" class="w-16 h-16 rounded-lg shadow-md flex-shrink-0">
+                    <div class="min-w-0">
+                        <p id="player-title" class="font-bold text-gray-800 truncate">Select an Audiobook</p>
+                        <p id="player-author" class="text-sm text-gray-500 truncate">to start listening</p>
+                    </div>
+                </div>
+
+                <!-- Center Section: Controls & Progress -->
+                <div class="flex flex-col items-center justify-center w-1/3 px-4">
+                    <div class="flex space-x-6 mb-2">
+                        <!-- Skip Back 10s -->
+                        <button onclick="skipTime(-10)" class="text-gray-500 hover:text-brand-purple transition">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg>
+                        </button>
+                        <!-- Play/Pause Button -->
+                        <button id="play-pause-btn" onclick="togglePlayPause()" class="p-3 rounded-full bg-brand-purple text-white shadow-xl hover:bg-brand-light transition transform active:scale-95">
+                            <!-- Play Icon (default) -->
+                            <svg id="play-icon" xmlns="http://www.w3.org/2000/svg" class="icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                            <!-- Pause Icon -->
+                            <svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" class="icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                        </button>
+                        <!-- Skip Forward 10s -->
+                        <button onclick="skipTime(10)" class="text-gray-500 hover:text-brand-purple transition">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg>
+                        </button>
+                    </div>
+                    <!-- Progress Bar and Time -->
+                    <div class="flex items-center w-full space-x-2">
+                        <span id="current-time" class="text-xs text-gray-500 w-10 text-right">0:00</span>
+                        <input type="range" id="progress-bar" value="0" min="0" max="100" step="0.1">
+                        <span id="duration-time" class="text-xs text-gray-500 w-10 text-left">0:00</span>
+                    </div>
+                </div>
+
+                <!-- Right Section: Volume (Hidden on small screens) -->
+                <div class="hidden sm:flex items-center justify-end w-1/3 space-x-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a4.99 4.99 0 010 7.08"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg>
+                    <input type="range" id="volume-control" min="0" max="1" step="0.01" value="1"
+                           class="w-24 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA SETUP ---
+        const audiobooks = [
+            { id: 1, title: "Cosmic Whispers", author: "Elara Vance", duration: "03:45:12", cover: "https://placehold.co/100x150/5b21b6/ffffff?text=SciFi", audioUrl: "/audio/cosmic_whispers.mp3" },
+            { id: 2, title: "The Silent Watch", author: "Thomas Reed", duration: "02:18:40", cover: "https://placehold.co/100x150/4b5563/ffffff?text=Thriller", audioUrl: "/audio/silent_watch.mp3" },
+            { id: 3, title: "Market Mastery", author: "Cynthia Chen", duration: "04:02:55", cover: "https://placehold.co/100x150/065f46/ffffff?text=Finance", audioUrl: "/audio/market_mastery.mp3" },
+            { id: 4, title: "Garden of Echoes", author: "Lia Moreau", duration: "01:59:30", cover: "https://placehold.co/100x150/7c3aed/ffffff?text=Romance", audioUrl: "/audio/garden_echoes.mp3" },
+            { id: 5, title: "History's Shadow", author: "Dr. J. Wells", duration: "05:11:05", cover: "https://placehold.co/100x150/2563eb/ffffff?text=History", audioUrl: "/audio/history_shadow.mp3" },
+            { id: 6, title: "Code Breaker 7", author: "M. K. Byte", duration: "03:22:10", cover: "https://placehold.co/100x150/111827/ffffff?text=Tech", audioUrl: "/audio/code_breaker.mp3" },
+        ];
+
+        // --- GLOBAL STATE & ELEMENTS ---
+        let currentTrack = null;
+        const audioElement = document.getElementById('audio-element');
+        const playerContainer = document.getElementById('audio-player-container');
+        const playerTitle = document.getElementById('player-title');
+        const playerAuthor = document.getElementById('player-author');
+        const playerCover = document.getElementById('player-cover');
+        const playIcon = document.getElementById('play-icon');
+        const pauseIcon = document.getElementById('pause-icon');
+        const progressBar = document.getElementById('progress-bar');
+        const currentTimeDisplay = document.getElementById('current-time');
+        const durationTimeDisplay = document.getElementById('duration-time');
+        const volumeControl = document.getElementById('volume-control');
+
+        // --- HELPER FUNCTIONS ---
+
+        /**
+         * Converts seconds to a display format (MM:SS).
+         * @param {number} seconds - Total seconds.
+         * @returns {string} Formatted time string.
+         */
+        function formatTime(seconds) {
+            if (isNaN(seconds) || seconds < 0) return '0:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        /**
+         * Updates the UI to show the current track information.
+         */
+        function updatePlayerUI() {
+            if (currentTrack) {
+                playerTitle.textContent = currentTrack.title;
+                playerAuthor.textContent = currentTrack.author;
+                playerCover.src = currentTrack.cover;
+                playerContainer.classList.remove('hidden');
+
+                // Update play/pause button icon based on audio state
+                if (!audioElement.paused) {
+                    playIcon.style.display = 'none';
+                    pauseIcon.style.display = 'block';
+                } else {
+                    playIcon.style.display = 'block';
+                    pauseIcon.style.display = 'none';
+                }
+
+            } else {
+                playerTitle.textContent = "Select an Audiobook";
+                playerAuthor.textContent = "to start listening";
+                playerContainer.classList.add('hidden');
+            }
+        }
+
+        // --- PLAYER CONTROLS ---
+
+        /**
+         * Loads and plays a selected audiobook.
+         * @param {object} audiobook - The audiobook data object.
+         */
+        function selectAndPlay(audiobook) {
+            currentTrack = audiobook;
+            audioElement.src = audiobook.audioUrl;
+            updatePlayerUI();
+            audioElement.load();
+            
+            // Wait for metadata to load to get duration, then play
+            audioElement.onloadedmetadata = () => {
+                const durationSeconds = audioElement.duration;
+                durationTimeDisplay.textContent = formatTime(durationSeconds);
+                progressBar.max = durationSeconds;
+                audioElement.play().catch(e => {
+                    console.error("Autoplay failed. Click play button to start.", e);
+                    // User needs to manually click play button due to browser restrictions
+                    showTemporaryMessage("Click the play button to start audio playback.");
+                    togglePlayPause(false); // Ensure pause icon is visible
+                });
+            };
+        }
+
+        /**
+         * Toggles the play/pause state of the audio.
+         * @param {boolean} [shouldPlay=null] - Optional forced state (true=play, false=pause).
+         */
+        function togglePlayPause(shouldPlay = null) {
+            if (!currentTrack) {
+                showTemporaryMessage("Please select an audiobook from the list first!");
+                return;
+            }
+
+            if (shouldPlay === true || (shouldPlay === null && audioElement.paused)) {
+                audioElement.play().catch(e => {
+                     console.error("Playback error:", e);
+                     showTemporaryMessage("Could not play audio. Check console or if the audio URL is valid.");
+                });
+            } else if (shouldPlay === false || (shouldPlay === null && !audioElement.paused)) {
+                audioElement.pause();
+            }
+            updatePlayerUI();
+        }
+
+        /**
+         * Skips forward or backward in the track.
+         * @param {number} timeChange - Time in seconds to change (e.g., 10 or -10).
+         */
+        function skipTime(timeChange) {
+            if (currentTrack) {
+                audioElement.currentTime += timeChange;
+            }
+        }
+
+        /**
+         * Event listener for time update (runs constantly during playback).
+         */
+        audioElement.ontimeupdate = () => {
+            const currentTime = audioElement.currentTime;
+            currentTimeDisplay.textContent = formatTime(currentTime);
+
+            // Update progress bar only if user is not actively dragging it
+            if (!progressBar.hasAttribute('data-dragging')) {
+                progressBar.value = currentTime;
+            }
+        };
+
+        /**
+         * Event listener for audio ending.
+         */
+        audioElement.onended = () => {
+            togglePlayPause(false);
+            showTemporaryMessage("Audiobook finished. Select another one to continue your journey!");
+            // Reset to start
+            audioElement.currentTime = 0;
+            progressBar.value = 0;
+            currentTimeDisplay.textContent = '0:00';
+            updatePlayerUI();
+        };
+        
+        // Handle play/pause icon update when audio state changes
+        audioElement.onplay = () => updatePlayerUI();
+        audioElement.onpause = () => updatePlayerUI();
+
+
+        // Progress Bar Interaction (Dragging)
+        progressBar.oninput = () => {
+            // This runs while the user drags or changes the value
+            currentTimeDisplay.textContent = formatTime(progressBar.value);
+            progressBar.setAttribute('data-dragging', 'true');
+        };
+
+        progressBar.onchange = () => {
+            // This runs when the user releases the mouse/finger
+            audioElement.currentTime = progressBar.value;
+            progressBar.removeAttribute('data-dragging');
+        };
+
+        // Volume Control
+        volumeControl.oninput = () => {
+            audioElement.volume = volumeControl.value;
+        };
+
+        // --- RENDERING LIST ---
+
+        /**
+         * Renders the list of audiobook cards.
+         */
+        function renderAudiobookList() {
+            const listContainer = document.getElementById('audiobook-list');
+            listContainer.innerHTML = audiobooks.map(book => `
+                <div class="bg-white rounded-xl shadow-lg hover:shadow-xl transition duration-300 overflow-hidden flex flex-col">
+                    <div class="p-4 flex space-x-4 items-center">
+                        <img src="${book.cover}" onerror="this.onerror=null; this.src='https://placehold.co/100x150/d1d5db/4b5563?text=Cover'" alt="Cover of ${book.title}" class="w-20 h-30 flex-shrink-0 rounded-lg shadow-md">
+                        <div class="flex-grow min-w-0">
+                            <h3 class="text-xl font-semibold text-gray-800 truncate">${book.title}</h3>
+                            <p class="text-sm text-gray-500 italic">by ${book.author}</p>
+                            <p class="text-md font-medium text-brand-purple mt-2">Duration: ${book.duration}</p>
+                        </div>
+                    </div>
+                    <div class="p-4 pt-0">
+                        <button
+                            onclick="selectAndPlay(${book.id})"
+                            class="w-full bg-brand-purple text-white py-2 rounded-lg font-semibold hover:bg-brand-light hover:text-gray-800 transition duration-150 shadow-md transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center space-x-2"
+                        >
+                            <!-- Play Icon -->
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                            <span>Listen Now</span>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        /**
+         * Temporary Message Box (Replaces alert())
+         */
+        function showTemporaryMessage(message) {
+            let msgBox = document.getElementById('temp-message-box');
+            if (!msgBox) {
+                msgBox = document.createElement('div');
+                msgBox.id = 'temp-message-box';
+                msgBox.className = 'fixed top-4 left-1/2 -translate-x-1/2 p-4 bg-red-600 text-white rounded-lg shadow-xl z-[100] opacity-0 transition-opacity duration-300';
+                document.body.appendChild(msgBox);
+            }
+            msgBox.textContent = message;
+            msgBox.style.opacity = 1;
+            setTimeout(() => {
+                msgBox.style.opacity = 0;
+            }, 3000);
+        }
+
+        /**
+         * Retrieves the audiobook object by ID (used for click handlers in HTML).
+         */
+        function selectAndPlay(id) {
+            const book = audiobooks.find(b => b.id === id);
+            if (book) {
+                selectAndPlay(book);
+            }
+        }
+
+        // --- INITIALIZATION ---
+        window.onload = () => {
+            renderAudiobookList();
+            updatePlayerUI();
+            audioElement.volume = volumeControl.value; // Set initial volume
+        };
+    </script>
+</body>
+</html>
